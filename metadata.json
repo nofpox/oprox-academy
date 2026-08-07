@@ -1,0 +1,6 @@
+{
+  "name": "OPROX OS",
+  "description": "Corporate Innovation Showcase and Live Autonomous AI Software Engineering Operating System",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
