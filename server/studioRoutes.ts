@@ -211,7 +211,7 @@ router.put('/api/studio/projects/:id', requireAuth, async (req: AuthRequest, res
       });
     }
 
-    res.json({ success: true, ...saveResult });
+    res.json({ ...saveResult, success: true });
   } catch (err: any) {
     res.status(400).json({ error: err?.message || 'Failed to save Studio project.' });
   }
@@ -288,7 +288,7 @@ router.post('/api/studio/projects/:id/promote', requireAuth, async (req: AuthReq
       workspaceProjectId: promoResult.workspaceProjectId,
     });
 
-    res.json({ success: true, ...promoResult });
+    res.json({ ...promoResult, success: true });
   } catch (err: any) {
     res.status(400).json({ error: err?.message || 'Studio promotion failed.' });
   }
@@ -475,7 +475,7 @@ router.post('/api/studio/projects/:id/export-workspace', requireAuth, async (req
     const exportResult = exportStudioToWorkspace(projectData.ir, userId);
 
     logSecurityAudit('PRIVILEGED_ADMIN_ACTION', req, { action: 'EXPORT_STUDIO_WORKSPACE', projectId: req.params.id });
-    res.json({ success: true, ...exportResult });
+    res.json({ ...exportResult, success: true });
   } catch (err: any) {
     res.status(400).json({ error: err?.message || 'Workspace export failed.' });
   }
@@ -614,6 +614,22 @@ const inMemoryReviews: any[] = [];
 const inMemorySyncConflicts: any[] = [];
 const inMemoryPromotionTraces: any[] = [];
 
+// ─── Task #4: Production Guard for Phase 4 In-Memory Stores ─────────────────
+// These arrays are development/test-only persistence. In production every write
+// must reach a real database. Until a database-backed store is wired up, all
+// write endpoints return 503 in production so the error is explicit rather than
+// silent data loss on restart.
+const PHASE4_PRODUCTION_MODE = process.env.NODE_ENV === 'production';
+function rejectPhase4InProduction(res: any, entity: string): boolean {
+  if (PHASE4_PRODUCTION_MODE) {
+    res.status(503).json({
+      error: `${entity} requires persistent database storage. Phase 4 in-memory stores are disabled in production. Configure DATABASE_URL and add the corresponding schema migration.`,
+    });
+    return true;
+  }
+  return false;
+}
+
 // 21. Phase 4 — Design Comments
 router.get('/api/studio/projects/:id/comments', requireAuth, async (req: AuthRequest, res) => {
   try {
@@ -630,6 +646,7 @@ router.get('/api/studio/projects/:id/comments', requireAuth, async (req: AuthReq
 
 router.post('/api/studio/projects/:id/comments', requireAuth, async (req: AuthRequest, res) => {
   try {
+    if (rejectPhase4InProduction(res, 'Design comments')) return;
     const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
     const userId = req.user!.id;
     const projectData = await getStudioProjectIr(req.params.id, tenantId);
@@ -666,6 +683,7 @@ router.post('/api/studio/projects/:id/comments', requireAuth, async (req: AuthRe
 
 router.patch('/api/studio/comments/:commentId', requireAuth, async (req: AuthRequest, res) => {
   try {
+    if (rejectPhase4InProduction(res, 'Design comments')) return;
     const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
     const comment = inMemoryComments.find((c) => c.id === req.params.commentId);
     if (!comment || comment.tenantId !== tenantId) {
@@ -699,6 +717,7 @@ router.get('/api/studio/projects/:id/experiments', requireAuth, async (req: Auth
 
 router.post('/api/studio/projects/:id/experiments', requireAuth, async (req: AuthRequest, res) => {
   try {
+    if (rejectPhase4InProduction(res, 'Design experiments')) return;
     const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
     const userId = req.user!.id;
     const projectData = await getStudioProjectIr(req.params.id, tenantId);
@@ -732,6 +751,7 @@ router.post('/api/studio/projects/:id/experiments', requireAuth, async (req: Aut
 
 router.post('/api/studio/experiments/:expId/promote', requireAuth, async (req: AuthRequest, res) => {
   try {
+    if (rejectPhase4InProduction(res, 'Experiment promotion')) return;
     const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
     const experiment = inMemoryExperiments.find((e) => e.id === req.params.expId);
     if (!experiment || experiment.tenantId !== tenantId) {
@@ -761,6 +781,7 @@ router.post('/api/studio/experiments/:expId/promote', requireAuth, async (req: A
 // 23. Phase 4 — Three-Way Design/Code Synchronization
 router.post('/api/studio/projects/:id/sync/analyze', requireAuth, async (req: AuthRequest, res) => {
   try {
+    if (rejectPhase4InProduction(res, 'Sync conflict analysis')) return;
     const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
     const projectData = await getStudioProjectIr(req.params.id, tenantId);
     if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });
@@ -797,6 +818,7 @@ router.post('/api/studio/projects/:id/sync/analyze', requireAuth, async (req: Au
 
 router.post('/api/studio/projects/:id/sync/resolve', requireAuth, async (req: AuthRequest, res) => {
   try {
+    if (rejectPhase4InProduction(res, 'Sync conflict resolution')) return;
     const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
     const projectData = await getStudioProjectIr(req.params.id, tenantId);
     if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });
@@ -837,6 +859,7 @@ router.get('/api/studio/projects/:id/reviews', requireAuth, async (req: AuthRequ
 
 router.post('/api/studio/projects/:id/reviews', requireAuth, async (req: AuthRequest, res) => {
   try {
+    if (rejectPhase4InProduction(res, 'Design reviews')) return;
     const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
     const projectData = await getStudioProjectIr(req.params.id, tenantId);
     if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });
@@ -923,6 +946,7 @@ router.post('/api/studio/projects/:id/copilot/propose', requireAuth, aiGovernanc
 // 28. Phase 4 — Governed Code Promotion
 router.post('/api/studio/projects/:id/promote-governed', requireAuth, async (req: AuthRequest, res) => {
   try {
+    if (rejectPhase4InProduction(res, 'Governed promotion')) return;
     const tenantId = req.user?.orgId || req.user?.id || 'tenant_default';
     const projectData = await getStudioProjectIr(req.params.id, tenantId);
     if (!projectData) return res.status(404).json({ error: 'Studio project not found or access denied.' });

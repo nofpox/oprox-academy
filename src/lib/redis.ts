@@ -143,3 +143,7 @@ export async function closeRedisConnection(): Promise<void> {
     }
   }
 }
+
+export function getRedisClient(): Redis | null {
+  return redisClient;
+}

@@ -25,6 +25,13 @@ const USERS_DB = [
 
 // 1. Authentication Routes
 router.post('/api/auth/login', authRateLimiter, (req, res) => {
+  // Task #4: USERS_DB is a Phase 1 mock. Block login in production — real auth requires
+  // a database-backed user store. Configure DATABASE_URL and the users schema.
+  if (process.env.NODE_ENV === 'production') {
+    logSecurityAudit('AUTH_FAILURE', { ip: req.ip, path: req.path, method: req.method }, { reason: 'Mock user database cannot be used in production' });
+    return res.status(503).json({ error: 'Authentication service not configured for production. Contact your administrator.' });
+  }
+
   const { email, password } = req.body;
 
   if (!email) {

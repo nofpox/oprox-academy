@@ -302,7 +302,7 @@ export async function listProjects(
 ): Promise<RealEstateProjectRow[]> {
   try {
     if (db) {
-      let query = db.select().from(realEstateProjectsTable).where(eq(realEstateProjectsTable.tenantId, tenantId));
+      const query = db.select().from(realEstateProjectsTable).where(eq(realEstateProjectsTable.tenantId, tenantId));
       const results = await query.orderBy(desc(realEstateProjectsTable.createdAt));
       if (results.length > 0) {
         return results.filter((p) => {

@@ -4,33 +4,59 @@ import * as schema from "./schema";
 
 const { Pool } = pg;
 
-let dbInstance: any = null;
-let pgPoolInstance: any = null;
+// In production, DATABASE_URL is mandatory.
+// In test mode (VITEST=1), we always use the in-memory fallback regardless of
+// DATABASE_URL — this keeps tests hermetic and prevents real DB writes.
+// In development without DATABASE_URL, the in-memory fallback is also used.
+const isTestEnv = !!process.env.VITEST || process.env.NODE_ENV === "test";
 
-if (process.env.DATABASE_URL) {
+if (!process.env.DATABASE_URL && process.env.NODE_ENV === "production") {
+  throw new Error(
+    "FATAL: DATABASE_URL environment variable is required in production but not set. " +
+    "Set DATABASE_URL in your environment before starting the server."
+  );
+}
+
+let pgPoolInstance: InstanceType<typeof Pool> | undefined;
+let dbInstance: ReturnType<typeof drizzle> | undefined;
+
+if (process.env.DATABASE_URL && !isTestEnv) {
   try {
     pgPoolInstance = new Pool({
       connectionString: process.env.DATABASE_URL,
-      max: (process.env.NODE_ENV === "test" || process.env.VITEST) ? 1 : 10,
+      ssl: process.env.NODE_ENV === "production"
+        ? { rejectUnauthorized: false }
+        : undefined,
+      max: 10,
     });
     dbInstance = drizzle(pgPoolInstance, { schema });
   } catch (err) {
-    console.warn("PostgreSQL connection error, falling back to memory store:", err);
+    throw new Error(`FATAL: PostgreSQL connection failed: ${err}`);
   }
 }
+
+// db is null when DATABASE_URL is not set or in test mode —
+// callers check `if (db)` before use and fall back to the in-memory store.
+export const db: ReturnType<typeof drizzle> | null = dbInstance ?? null;
 
 export async function closeDbConnections(): Promise<void> {
   if (pgPoolInstance) {
     try {
       await pgPoolInstance.end();
-      dbInstance = null;
     } catch {
       // Ignore cleanup error
     }
   }
 }
 
-// In-Memory Fallback DB Store for development/preview without direct PG connection
+
+// ---------------------------------------------------------------------------
+// In-Memory Store — development/test scaffold only.
+// Fake payment credentials have been removed. Configure real keys via env vars:
+//   STRIPE_PUBLISHABLE_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+// This store does NOT replace the real database; it exists so lib modules
+// compile and run during development until full Drizzle migration (task #4).
+// ---------------------------------------------------------------------------
 class MemoryDbStore {
   systemState = new Map<string, { key: string; value: string; updatedAt: Date }>();
   emergencyLogs: schema.EmergencyActionLog[] = [];
@@ -56,13 +82,14 @@ class MemoryDbStore {
   invoiceSequences = new Map<number, number>();
   coupons = new Map<string, schema.CouponRow>();
   billingEvents: schema.BillingEventRow[] = [];
+  // Stripe credentials must come from environment variables — never hardcoded.
   paymentProviderConfig: schema.PaymentProviderConfigRow = {
     id: "stripe",
-    enabled: true,
+    enabled: false,
     mode: "test",
-    publishableKey: "pk_test_oprox_sample_key_12345",
-    secretKey: "sk_test_oprox_sample_secret_67890",
-    webhookSecret: "whsec_oprox_test_secret",
+    publishableKey: process.env.STRIPE_PUBLISHABLE_KEY ?? "",
+    secretKey: process.env.STRIPE_SECRET_KEY ?? "",
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
     updatedAt: new Date(),
   };
 
@@ -521,5 +548,3 @@ class MemoryDbStore {
 }
 
 export const memoryDb = new MemoryDbStore();
-
-export const db = dbInstance;

@@ -518,7 +518,7 @@ export async function updatePaymentProviderConfig(updates: Partial<typeof memory
     ...memoryDb.paymentProviderConfig,
     ...encryptedUpdates,
     updatedAt: new Date(),
-  };
+  } as typeof memoryDb.paymentProviderConfig;
 
   if (db) {
     try {

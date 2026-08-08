@@ -253,9 +253,16 @@ export async function listLeadActivities(tenantId: string, leadId: string): Prom
       .where(and(eq(realEstateLeadActivitiesTable.tenantId, tenantId), eq(realEstateLeadActivitiesTable.leadId, leadId)))
       .orderBy(desc(realEstateLeadActivitiesTable.createdAt));
   }
-  return memoryLeadActivities
-    .filter((a) => a.tenantId === tenantId && a.leadId === leadId)
-    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  const filtered = memoryLeadActivities
+    .map((a, i) => ({ activity: a, idx: i }))
+    .filter(({ activity: a }) => a.tenantId === tenantId && a.leadId === leadId);
+  // Sort newest-first; use original insertion index as a stable tiebreaker
+  // when two events have the same millisecond timestamp (e.g. rapid test calls).
+  filtered.sort((x, y) => {
+    const timeDiff = y.activity.createdAt.getTime() - x.activity.createdAt.getTime();
+    return timeDiff !== 0 ? timeDiff : y.idx - x.idx;
+  });
+  return filtered.map(({ activity }) => activity);
 }
 
 // ── PROPERTY MATCHING ─────────────────────────────────────────────────────

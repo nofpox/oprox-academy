@@ -144,7 +144,7 @@ export async function listProperties(
     if (filters?.status) conds.push(eq(realEstatePropertiesTable.status, filters.status));
     if (filters?.city) conds.push(eq(realEstatePropertiesTable.addressCity, filters.city));
 
-    let query = db.select().from(realEstatePropertiesTable).where(and(...conds)).orderBy(desc(realEstatePropertiesTable.createdAt));
+    const query = db.select().from(realEstatePropertiesTable).where(and(...conds)).orderBy(desc(realEstatePropertiesTable.createdAt));
     let results = await query;
 
     if (filters?.search) {

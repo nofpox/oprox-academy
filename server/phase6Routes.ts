@@ -378,7 +378,7 @@ router.post('/api/phase6/ci/repair', requireAuth, async (req: AuthRequest, res) 
       currentAttempt,
     });
 
-    res.json({ success: true, ...repairResult });
+    res.json({ ...repairResult, success: true });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || 'Failed to execute AI repair loop' });
   }

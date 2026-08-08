@@ -59,8 +59,8 @@ export async function evaluateReleaseGate(
 
   // Check 2: Environment Governance
   const envValidation = await validateEnvironmentConfig(tenantId, environment);
-  let envCheckStatus: 'PASS' | 'FAIL' | 'NOT_CONFIGURED' = envValidation.isReady ? 'PASS' : 'FAIL';
-  let envCheckDetails = envValidation.isReady
+  const envCheckStatus: 'PASS' | 'FAIL' | 'NOT_CONFIGURED' = envValidation.isReady ? 'PASS' : 'FAIL';
+  const envCheckDetails = envValidation.isReady
     ? 'All required environment variables configured'
     : `Missing required env vars: ${envValidation.variables.filter((v) => v.status !== 'CONFIGURED').map((v) => v.key).join(', ')}`;
 

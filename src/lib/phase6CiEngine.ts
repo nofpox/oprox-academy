@@ -57,7 +57,7 @@ export function parseVitestOutput(output: string): VitestTestResultsSummary {
   let passedSuites = 12;
   let totalTests = 163;
   let passedTests = 163;
-  let failedTests = 0;
+  const failedTests = 0;
 
   const testMatch = output.match(/Tests\s+(\d+)\s+passed/i);
   if (testMatch) {

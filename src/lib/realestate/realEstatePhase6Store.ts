@@ -116,7 +116,7 @@ export async function createImmersiveAsset(input: ImmersiveAssetInput) {
 
   if (isDbAvailable()) {
     try {
-      await db.insert(realEstateImmersiveAssetsTable).values(asset);
+      await db!.insert(realEstateImmersiveAssetsTable).values(asset);
     } catch (err) {
       memoryAssets.set(asset.id, asset);
     }
@@ -137,7 +137,7 @@ export async function listImmersiveAssets(
 ) {
   if (isDbAvailable()) {
     try {
-      let conditions = [eq(realEstateImmersiveAssetsTable.tenantId, tenantId)];
+      const conditions = [eq(realEstateImmersiveAssetsTable.tenantId, tenantId)];
       if (filters?.linkedEntityType) {
         conditions.push(eq(realEstateImmersiveAssetsTable.linkedEntityType, filters.linkedEntityType));
       }
@@ -148,7 +148,7 @@ export async function listImmersiveAssets(
         conditions.push(eq(realEstateImmersiveAssetsTable.assetType, filters.assetType));
       }
 
-      const rows = await db
+      const rows = await db!
         .select()
         .from(realEstateImmersiveAssetsTable)
         .where(and(...conditions))
@@ -173,7 +173,7 @@ export async function listImmersiveAssets(
 export async function getImmersiveAsset(tenantId: string, assetId: string) {
   if (isDbAvailable()) {
     try {
-      const [row] = await db
+      const [row] = await db!
         .select()
         .from(realEstateImmersiveAssetsTable)
         .where(
@@ -201,7 +201,7 @@ export async function deleteImmersiveAsset(tenantId: string, assetId: string) {
 
   if (isDbAvailable()) {
     try {
-      await db
+      await db!
         .delete(realEstateImmersiveAssetsTable)
         .where(
           and(
@@ -243,7 +243,7 @@ export async function createDigitalTwin(input: DigitalTwinInput) {
 
   if (isDbAvailable()) {
     try {
-      await db.insert(realEstateDigitalTwinsTable).values(dt);
+      await db!.insert(realEstateDigitalTwinsTable).values(dt);
     } catch (err) {
       memoryDigitalTwins.set(dt.id, dt);
     }
@@ -264,7 +264,7 @@ export async function listDigitalTwins(
 ) {
   if (isDbAvailable()) {
     try {
-      let conditions = [eq(realEstateDigitalTwinsTable.tenantId, tenantId)];
+      const conditions = [eq(realEstateDigitalTwinsTable.tenantId, tenantId)];
       if (filters?.linkedEntityType) {
         conditions.push(eq(realEstateDigitalTwinsTable.linkedEntityType, filters.linkedEntityType));
       }
@@ -275,7 +275,7 @@ export async function listDigitalTwins(
         conditions.push(eq(realEstateDigitalTwinsTable.isCurrentVersion, true));
       }
 
-      const rows = await db
+      const rows = await db!
         .select()
         .from(realEstateDigitalTwinsTable)
         .where(and(...conditions))
@@ -300,7 +300,7 @@ export async function listDigitalTwins(
 export async function getDigitalTwin(tenantId: string, id: string) {
   if (isDbAvailable()) {
     try {
-      const [row] = await db
+      const [row] = await db!
         .select()
         .from(realEstateDigitalTwinsTable)
         .where(
@@ -335,7 +335,7 @@ export async function createDigitalTwinVersion(
   // Set current version isCurrentVersion to false
   if (isDbAvailable()) {
     try {
-      await db
+      await db!
         .update(realEstateDigitalTwinsTable)
         .set({ isCurrentVersion: false, updatedAt: new Date() })
         .where(
@@ -381,7 +381,7 @@ export async function createDigitalTwinVersion(
 
   if (isDbAvailable()) {
     try {
-      await db.insert(realEstateDigitalTwinsTable).values(newDt);
+      await db!.insert(realEstateDigitalTwinsTable).values(newDt);
     } catch (err) {
       memoryDigitalTwins.set(newDt.id, newDt);
     }
@@ -450,7 +450,7 @@ export async function logCapabilityCheck(
 
   if (isDbAvailable()) {
     try {
-      await db.insert(realEstateVRARLogsTable).values(log);
+      await db!.insert(realEstateVRARLogsTable).values(log);
     } catch (err) {
       memoryCapabilityLogs.set(log.id, log);
     }

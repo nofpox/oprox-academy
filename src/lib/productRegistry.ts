@@ -40,8 +40,8 @@ export async function getCentralFinancialOverview() {
   const invoices = await getInvoices();
   const aiStats = await getAiUsageStats();
 
-  let activeSubscriptions = subs.filter((s) => s.status === 'active').length;
-  let totalRevenueCents = invoices.reduce((sum, inv) => sum + (inv.amountPaid || 0), 0);
+  const activeSubscriptions = subs.filter((s) => s.status === 'active').length;
+  const totalRevenueCents = invoices.reduce((sum, inv) => sum + (inv.amountPaid || 0), 0);
 
   const products = Array.from(memoryDb.productRegistry.values());
   const totalRevenueUsd = totalRevenueCents / 100;

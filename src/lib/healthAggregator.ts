@@ -1,6 +1,7 @@
 import { db, memoryDb } from "../db";
 import { platformHealthSnapshotsTable } from "../db/schema";
 import { getRedisStatus } from "./redis";
+import { sql } from "drizzle-orm";
 
 export interface HealthCheckResult {
   service: string;
@@ -25,7 +26,7 @@ export async function collectHealthSnapshot(): Promise<HealthSnapshot> {
   const dbStart = Date.now();
   if (db) {
     try {
-      await db.execute(db.raw ? db.raw`SELECT 1` : 'SELECT 1' as any);
+      await db.execute(sql`SELECT 1`);
       checks.push({
         service: "PostgreSQL Database Engine",
         status: "healthy",
@@ -103,7 +104,7 @@ export async function collectHealthSnapshot(): Promise<HealthSnapshot> {
       });
     } catch {
       memoryDb.healthSnapshots.unshift({
-        id: snapshot.id,
+        id: snapshot.id!,
         overallStatus,
         latencyMs: totalLatency,
         checks,
@@ -112,7 +113,7 @@ export async function collectHealthSnapshot(): Promise<HealthSnapshot> {
     }
   } else {
     memoryDb.healthSnapshots.unshift({
-      id: snapshot.id,
+      id: snapshot.id!,
       overallStatus,
       latencyMs: totalLatency,
       checks,

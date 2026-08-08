@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { logSecurityAudit } from './audit';
+import { getRedisClient, isRedisConnected } from '../src/lib/redis';
 
 export type UserRole = 'user' | 'admin' | 'superadmin';
 
@@ -15,9 +16,16 @@ export interface AuthRequest extends Request {
   user?: AuthenticatedUser;
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'oprox-os-phase1-secure-jwt-key-2026';
+if (!process.env.JWT_SECRET) {
+  throw new Error(
+    'FATAL: JWT_SECRET environment variable is required but not set. ' +
+    'Server cannot start without a secure signing secret. ' +
+    'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(64).toString(\'hex\'))"'
+  );
+}
+const JWT_SECRET = process.env.JWT_SECRET;
 
-// Blacklist store for invalidated tokens (logout)
+// Blacklist store for invalidated tokens (logout) — in-memory fallback
 const tokenBlacklist = new Set<string>();
 
 export function generateToken(user: AuthenticatedUser, expiresIn: string = '8h'): string {
@@ -26,8 +34,23 @@ export function generateToken(user: AuthenticatedUser, expiresIn: string = '8h')
   });
 }
 
-export function invalidateToken(token: string): void {
+export async function invalidateToken(token: string): Promise<void> {
+  // Always add to in-memory set as synchronous fallback
   tokenBlacklist.add(token);
+
+  // Also write to Redis if available, with TTL derived from token expiry
+  if (isRedisConnected()) {
+    const redis = getRedisClient();
+    if (redis) {
+      try {
+        const decoded = jwt.decode(token) as { exp?: number } | null;
+        const ttl = decoded?.exp ? Math.max(1, decoded.exp - Math.floor(Date.now() / 1000)) : 28800;
+        await redis.setex('token_blacklist:' + token, ttl, '1');
+      } catch {
+        // Redis write failure is non-fatal; in-memory set already updated
+      }
+    }
+  }
 }
 
 // Helper to extract bearer token or cookie
@@ -45,12 +68,28 @@ export function extractToken(req: Request): string | null {
 }
 
 // 1. Authentication Middleware (Requires valid logged-in user)
-export function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
+export async function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
   const token = extractToken(req);
 
   if (!token) {
     logSecurityAudit('AUTH_FAILURE', { ip: req.ip, path: req.path, method: req.method }, { reason: 'Missing authentication token' });
     return res.status(401).json({ error: 'Authentication required. Please provide a valid Bearer token.' });
+  }
+
+  // Check Redis first (cross-instance invalidation), fall through to in-memory on failure
+  if (isRedisConnected()) {
+    const redis = getRedisClient();
+    if (redis) {
+      try {
+        const blacklisted = await redis.exists('token_blacklist:' + token);
+        if (blacklisted) {
+          logSecurityAudit('AUTH_FAILURE', { ip: req.ip, path: req.path, method: req.method }, { reason: 'Token has been invalidated/logged out' });
+          return res.status(401).json({ error: 'Session invalidated. Please log in again.' });
+        }
+      } catch {
+        // Redis check failure falls through to in-memory check below
+      }
+    }
   }
 
   if (tokenBlacklist.has(token)) {
@@ -59,7 +98,14 @@ export function requireAuth(req: AuthRequest, res: Response, next: NextFunction)
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as AuthenticatedUser;
+    const decoded = jwt.verify(token, JWT_SECRET) as AuthenticatedUser & { iat?: number };
+    // Task #5: reject tokens issued before the secret rotation cutoff.
+    // Operators set JWT_ISSUED_AFTER (Unix seconds) after rotating JWT_SECRET.
+    const issuedAfterTs = process.env.JWT_ISSUED_AFTER ? parseInt(process.env.JWT_ISSUED_AFTER, 10) : 0;
+    if (issuedAfterTs > 0 && typeof decoded.iat === 'number' && decoded.iat < issuedAfterTs) {
+      logSecurityAudit('AUTH_FAILURE', { ip: req.ip, path: req.path, method: req.method }, { reason: 'Token predates JWT secret rotation cutoff' });
+      return res.status(401).json({ error: 'Session invalidated due to a security rotation. Please log in again.' });
+    }
     req.user = {
       id: decoded.id,
       email: decoded.email,
@@ -74,19 +120,40 @@ export function requireAuth(req: AuthRequest, res: Response, next: NextFunction)
 }
 
 // Optional Auth (populates req.user if token present, but proceeds anyway)
-export function optionalAuth(req: AuthRequest, res: Response, next: NextFunction) {
+export async function optionalAuth(req: AuthRequest, res: Response, next: NextFunction) {
   const token = extractToken(req);
-  if (token && !tokenBlacklist.has(token)) {
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as AuthenticatedUser;
-      req.user = {
-        id: decoded.id,
-        email: decoded.email,
-        role: decoded.role,
-        orgId: decoded.orgId,
-      };
-    } catch {
-      // Ignore invalid token in optional auth
+  if (token) {
+    let isBlacklisted = false;
+
+    // Check Redis first, fall through to in-memory on failure
+    if (isRedisConnected()) {
+      const redis = getRedisClient();
+      if (redis) {
+        try {
+          const blacklisted = await redis.exists('token_blacklist:' + token);
+          if (blacklisted) isBlacklisted = true;
+        } catch {
+          // Redis check failure falls through to in-memory check
+        }
+      }
+    }
+
+    if (!isBlacklisted && tokenBlacklist.has(token)) {
+      isBlacklisted = true;
+    }
+
+    if (!isBlacklisted) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as AuthenticatedUser;
+        req.user = {
+          id: decoded.id,
+          email: decoded.email,
+          role: decoded.role,
+          orgId: decoded.orgId,
+        };
+      } catch {
+        // Ignore invalid token in optional auth
+      }
     }
   }
   next();

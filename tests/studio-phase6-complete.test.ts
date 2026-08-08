@@ -192,7 +192,7 @@ describe('OPROX Studio Phase 6 — Production Hardening & Final Acceptance Suite
       expect(safeAsset.safe).toBe(true);
 
       // Deletion protection check
-      baseIr.pages[0].rootNode.children.push({
+      baseIr.pages[0]!.rootNode!.children!.push({
         id: 'node_img_ref',
         name: 'Hero Image',
         type: 'Image',

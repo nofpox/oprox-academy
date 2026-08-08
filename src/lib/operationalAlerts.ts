@@ -1,6 +1,7 @@
 import { db, memoryDb } from "../db";
 import { operationalAlertConfigsTable, operationalAlertIncidentsTable } from "../db/schema";
 import { collectHealthSnapshot } from "./healthAggregator";
+import { eq } from "drizzle-orm";
 
 export async function listAlertConfigs() {
   if (db) {
@@ -19,7 +20,7 @@ export async function updateAlertConfig(id: string, updates: { enabled?: boolean
       await db
         .update(operationalAlertConfigsTable)
         .set({ ...updates, updatedAt: new Date() })
-        .where(db.eq(operationalAlertConfigsTable.id, id));
+        .where(eq(operationalAlertConfigsTable.id, id));
     } catch {
       const existing = memoryDb.alertConfigs.get(id);
       if (existing) {
@@ -51,7 +52,7 @@ export async function resolveIncident(id: string) {
       await db
         .update(operationalAlertIncidentsTable)
         .set({ status: "resolved", resolvedAt: new Date() })
-        .where(db.eq(operationalAlertIncidentsTable.id, id));
+        .where(eq(operationalAlertIncidentsTable.id, id));
     } catch {
       const inc = memoryDb.alertIncidents.find((i) => i.id === id);
       if (inc) {

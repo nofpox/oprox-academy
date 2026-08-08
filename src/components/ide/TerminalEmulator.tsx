@@ -60,9 +60,9 @@ export const TerminalEmulator: React.FC<TerminalEmulatorProps> = ({
         </div>
 
         {logs.map((log, idx) => {
-          let isError = log.includes('[ERROR]') || log.includes('failed');
-          let isSuccess = log.includes('[SUCCESS]') || log.includes('passed') || log.includes('Deployed');
-          let isCmd = log.startsWith('oprox@workspace:~$');
+          const isError = log.includes('[ERROR]') || log.includes('failed');
+          const isSuccess = log.includes('[SUCCESS]') || log.includes('passed') || log.includes('Deployed');
+          const isCmd = log.startsWith('oprox@workspace:~$');
 
           return (
             <div

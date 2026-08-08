@@ -8,7 +8,8 @@ import { getCostGuardSettings, getCostGuardDailyUsage, recordCostGuardUsage } fr
 import { getWalletBalance as getWalletBalanceLib, adjustWalletBalance } from '../src/lib/aiWallet';
 import { checkDistributedRateLimit, clearMemoryRateStore } from '../src/lib/redis';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'oprox-os-phase1-secure-jwt-key-2026';
+// JWT_SECRET is guaranteed non-null here: auth.ts throws at module load if it is missing.
+const JWT_SECRET = process.env.JWT_SECRET as string;
 
 // Shared State for Governance Overrides (Kept for backwards compatibility and test overrides)
 export interface GovernanceState {

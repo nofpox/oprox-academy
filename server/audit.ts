@@ -35,7 +35,8 @@ export interface SecurityAuditEvent {
     | 'ACADEMY_TUTOR_INTERACTION'
     | 'ACADEMY_MASTERY_UPDATED'
     | 'ACADEMY_LAB_SESSION_STARTED'
-    | 'ACADEMY_LAB_SUBMITTED';
+    | 'ACADEMY_LAB_SUBMITTED'
+    | 'STRIPE_WEBHOOK_PROCESSING_ERROR';
   userId?: string;
   userRole?: string;
   orgId?: string;

@@ -1,9 +1,9 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import helmet from 'helmet';
 import cors from 'cors';
 import { GoogleGenAI } from '@google/genai';
-import dotenv from 'dotenv';
 import { Server } from 'http';
 
 import adminRoutes from './server/adminRoutes';
@@ -21,6 +21,7 @@ import { AuthRequest, requireAuth } from './server/auth';
 import { logStructured } from './src/lib/logger';
 import { getRedisStatus, closeRedisConnection } from './src/lib/redis';
 import { db, closeDbConnections } from './src/db';
+import { sql } from 'drizzle-orm';
 import { isKillSwitchActive } from './src/lib/killSwitch';
 import {
   createSubscriptionAtomic,
@@ -49,8 +50,6 @@ import {
   updateWorkspaceProject,
   deleteWorkspaceProject,
 } from './src/lib/workspaceProjects';
-
-dotenv.config();
 
 export const app = express();
 
@@ -121,7 +120,7 @@ app.get(['/api/readiness', '/readyz'], async (req, res) => {
 
   if (db) {
     try {
-      await db.execute(db.raw ? db.raw`SELECT 1` : 'SELECT 1' as any);
+      await db.execute(sql`SELECT 1`);
       dbStatus = 'connected';
       dbDetails = 'PostgreSQL active and responsive';
     } catch (err: any) {
